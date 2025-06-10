@@ -2,11 +2,20 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// Obtener todos los usuarios
-router.get('/', (req, res) => {
-  db.query('SELECT * FROM usuarios', (err, results) => {
-    if (err) return res.status(500).json({ error: err });
-    res.json(results);
+// Obtener info de usuario
+router.post('/obtenerusuario', (req, res) => {
+  const { correo } = req.body;
+  if (!correo) {
+    return res.status(400).json({ error: 'El correo es requerido' });
+  }
+  db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error al consultar la base de datos' });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(results[0]);
   });
 });
 

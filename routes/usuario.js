@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -13,17 +14,18 @@ router.post('/obtenerusuario', (req, res) => {
       return res.status(500).json({ error: 'Error al consultar la base de datos' });
     }
     if (results.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+      return res.status(200).json({ error: 'Usuario no encontrado' });
     }
     res.json(results[0]);
   });
 });
 
 // Crear nuevo usuario
-router.post('/crearusuario', (req, res) => {
-  const { nombre, correo, idioma_preferido } = req.body;
-  db.query('INSERT INTO usuarios (nombre, correo, idioma_preferido) VALUES (?, ?, ?)', 
-    [nombre, correo, idioma_preferido], 
+router.post('/crearusuario', async (req, res) => {
+  const { nombre, correo, idioma_preferido, contrasena } = req.body;
+  const pass_hash = await bcrypt.hash(contrasena, 10)
+  db.query('INSERT INTO usuarios (nombre, correo, idioma_preferido, contrasena) VALUES (?, ?, ?, ?)', 
+    [nombre, correo, idioma_preferido, pass_hash], 
     (err, result) => {
       if (err) return res.status(500).json({ error: err });
       res.json({ id: result.insertId, nombre, correo, idioma_preferido });

@@ -15,7 +15,7 @@ router.post('/gethistorial', (req, res) => {
       print(err);
     }
     if (results.length === 0) {
-      return res.status(404).json({ error: 'No se encontraron conversaciones' });
+      return res.status(200).json({ error: 'No se encontraron conversaciones' });
     }
     res.json(results);
   });
@@ -31,9 +31,22 @@ router.post("/borrarconversacion", (req, res) => {
       return res.status(500).json({ error: 'Error al borrar la conversación' });
     }
     if (results.affectedRows === 0) {
-      return res.status(404).json({ error: 'Conversación no encontrada' });
+      return res.status(200).json({ error: 'Conversación no encontrada' });
     }
     res.json({ message: 'Conversación borrada' });
+  })
+})
+
+router.post("/borrarhistorial", (req, res) => {
+  const { id_usuario } = req.body;
+  if (!id_usuario) {
+    return res.status(404).json({ error: "No se encuentra el id del usuario" })
+  }
+  db.query("delete from conversaciones where usuario_id = ?", [id_usuario], (err, results) => {
+    if (results.affectedRows === 0) {
+        return res.status(200).json({ error: 'Conversaciones no encontrada' });
+      }
+      res.json({ message: 'Conversaciones borradas' });
   })
 })
 

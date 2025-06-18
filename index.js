@@ -13,7 +13,7 @@ const PORT = 4000
 
 app.use(cors())
 app.use(bodyParser.json())
-
+app.use(express.json())
 app.use('/usuarios', usuarioRoutes)
 app.use('/conversaciones', conversacionesRoutes)
 app.use('/ajustes', ajustesRoutes)

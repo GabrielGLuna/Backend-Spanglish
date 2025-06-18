@@ -3,7 +3,7 @@ const router = express.Router();
 const translate = require('translate-google'); 
 
 
-router.post('/traducir', async (req, res) => {
+router.post('/', async (req, res) => {
   const { text, sourceLang, targetLang } = req.body;
 
   if (!text || !sourceLang || !targetLang) {

@@ -3,6 +3,19 @@ const router = express.Router();
 const db = require('../db');
 
 
+router.post("/add", (req, res) => {
+    const { usuario_id, texto_original, texto_traducido, idioma_origen, idioma_destino } = req.body;
+    if (!usuario_id || !idioma_origen || !idioma_destino || !texto_traducido || !texto_original) {
+        return res.status(400).json({ error: 'Faltan parámetros requeridos: usuario_id, texto, idioma_origen o idioma_destino.' });
+    }
+    db.query("INSERT INTO conversaciones (usuario_id, texto_original, texto_traducido, idioma_origen, idioma_destino) VALUES (?, ?, ?, ?, ?)", [usuario_id, texto_original, texto_traducido, idioma_origen, idioma_destino], (err, result) => {
+        if (err) {
+            return res.status(500).json({ error: 'Error al insertar la conversación en la base de datos.' });
+        }
+        res.status(201).json({ message: 'Conversación agregada correctamente', id: result.insertId });
+    });
+})
+
 // obtener historial de un usuario con id
 router.post('/gethistorial', (req, res) => {
   const { id_usuario } = req.body;

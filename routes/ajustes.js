@@ -25,30 +25,48 @@ router.post('/', (req, res) => {
 
 // modificar un ajuste
 router.put('/modificarajuste', (req, res) => {
-  const { usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa } = req.body;
+  const { usuario_id, ...updates } = req.body;
 
-  if (!usuario_id) {
-    return res.status(400).json({ error: 'usuario_id es requerido' });
+  if(!usuario_id){
+    return res.status(400).json({error: 'El usuario_id es obligatorio'})
   }
 
-  const valores = [notificaciones, modo_oscuro, velocidad_voz, voz_activa, usuario_id];
+  const camposPermitidos = ['notificaciones', 'modo_oscuro', 'velocidad_voz', 'voz_activa']
+  const camposActualizar = Object.keys(updates).filter(campo => camposPermitidos.includes(campo))
+  // Validar que todos los campos estén presentes
+  if (
+    usuario_id === undefined ||
+    notificaciones === undefined ||
+    modo_oscuro === undefined ||
+    velocidad_voz === undefined ||
+    voz_activa === undefined
+  ) {
+    return res.status(400).json({ error: 'Faltan parámetros en la solicitud' });
+  }
 
-  db.query(
-    `UPDATE ajustes 
-     SET notificaciones = ?, modo_oscuro = ?, velocidad_voz = ?, voz_activa = ?
-     WHERE usuario_id = ?`,
-    valores,
-    (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'Ajustes no encontrados para este usuario' });
-      }
-      return res.status(200).json({
-        mensaje: 'Ajustes actualizados correctamente',
-        datos: { usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa }
-      });
+  const valores = camposActualizar.map(campo => updates[campo])
+  const query = `
+    UPDATE ajustes 
+    SET
+      ${camposActualizar.map(campo => `${campo} = ?`).join(',')}
+    WHERE usuario_id = ?
+  `;
+
+  db.query(query, [...valores,usuario_id], (err, result) => {
+    if (err) {
+      console.error('Error al actualizar el ajuste:', err);
+      return res.status(500).json({ error: 'Error al actualizar ajuste' });
     }
-  );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.status(200).json({
+      message: 'Ajustes actualizados correctamente',
+      data: { usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa }
+    });
+  });
 });
 
 module.exports = router;

@@ -6,7 +6,6 @@ const db = require('../db');
 const jwt = require('jsonwebtoken');
 const { SECRET_KEY } = require('./auth');
 
-// Pre-registro: valida email único, genera código y envía email
 router.post('/pre-registro', (req, res) => {
   const { nombre, correo, idioma_preferido, contrasena } = req.body;
 
@@ -14,14 +13,12 @@ router.post('/pre-registro', (req, res) => {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
   }
 
-  // NUEVA VALIDACIÓN: Verificar si el email ya está registrado
   db.query('SELECT id FROM usuarios WHERE correo = ?', [correo], (err, results) => {
     if (err) {
       console.error('Error checking email:', err);
       return res.status(500).json({ error: 'Error al verificar el correo' });
     }
 
-    // Si ya existe un usuario con ese correo
     if (results.length > 0) {
       return res.status(409).json({ 
         error: 'Este correo ya está registrado',

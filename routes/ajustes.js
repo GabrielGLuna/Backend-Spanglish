@@ -33,16 +33,6 @@ router.put('/modificarajuste', (req, res) => {
 
   const camposPermitidos = ['notificaciones', 'modo_oscuro', 'velocidad_voz', 'voz_activa']
   const camposActualizar = Object.keys(updates).filter(campo => camposPermitidos.includes(campo))
-  // Validar que todos los campos estén presentes
-  if (
-    usuario_id === undefined ||
-    notificaciones === undefined ||
-    modo_oscuro === undefined ||
-    velocidad_voz === undefined ||
-    voz_activa === undefined
-  ) {
-    return res.status(400).json({ error: 'Faltan parámetros en la solicitud' });
-  }
 
   const valores = camposActualizar.map(campo => updates[campo])
   const query = `
@@ -64,7 +54,7 @@ router.put('/modificarajuste', (req, res) => {
 
     res.status(200).json({
       message: 'Ajustes actualizados correctamente',
-      data: { usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa }
+      data: { usuario_id, camposActualizar }
     });
   });
 });

@@ -256,4 +256,96 @@ const sendCodeEmail = async (email, code) => {
   }
 };
 
+router.post('/actualizar', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  let decoded;
+  try {
+    decoded = jwt.verify(token, SECRET_KEY);
+  } catch (err) {
+    console.error('Token inválido:', err);
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+
+  const { nombre, idioma_preferido, contrasena_actual, contrasena_nueva, confirmar_contrasena } = req.body;
+
+  if (!nombre || !idioma_preferido) {
+    return res.status(400).json({ error: 'Nombre e idioma son obligatorios' });
+  }
+
+  // Buscar usuario
+  db.query('SELECT * FROM usuarios WHERE correo = ?', [decoded.correo], async (err, results) => {
+    if (err) {
+      console.error('Error buscando usuario:', err);
+      return res.status(500).json({ error: 'Error interno' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const usuario = results[0];
+
+    // Si quiere cambiar la contraseña
+    if (contrasena_actual || contrasena_nueva || confirmar_contrasena) {
+      if (!contrasena_actual || !contrasena_nueva || !confirmar_contrasena) {
+        return res.status(400).json({ error: 'Completa todos los campos de contraseña para actualizarla' });
+      }
+
+      if (contrasena_nueva.length < 8) {
+        return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+      }
+
+      if (contrasena_nueva !== confirmar_contrasena) {
+        return res.status(400).json({ error: 'Las nuevas contraseñas no coinciden' });
+      }
+
+      try {
+        const match = await bcrypt.compare(contrasena_actual, usuario.contrasena);
+        if (!match) {
+          return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+        }
+
+        const nueva_hash = await bcrypt.hash(contrasena_nueva, 10);
+
+        db.query(
+          'UPDATE usuarios SET nombre = ?, idioma_preferido = ?, contrasena = ? WHERE id = ?',
+          [nombre, idioma_preferido, nueva_hash, usuario.id],
+          (err2) => {
+            if (err2) {
+              console.error('Error actualizando usuario:', err2);
+              return res.status(500).json({ error: 'Error al actualizar usuario' });
+            }
+
+            return res.json({ message: 'Perfil y contraseña actualizados correctamente' });
+          }
+        );
+
+      } catch (errCompare) {
+        console.error('Error procesando contraseña:', errCompare);
+        return res.status(500).json({ error: 'Error al procesar la contraseña' });
+      }
+
+    } else {
+      // Solo actualizar datos
+      db.query(
+        'UPDATE usuarios SET nombre = ?, idioma_preferido = ? WHERE id = ?',
+        [nombre, idioma_preferido, usuario.id],
+        (err2) => {
+          if (err2) {
+            console.error('Error actualizando usuario:', err2);
+            return res.status(500).json({ error: 'Error al actualizar usuario' });
+          }
+
+          return res.json({ message: 'Perfil actualizado correctamente' });
+        }
+      );
+    }
+  });
+});
+
 module.exports = router;

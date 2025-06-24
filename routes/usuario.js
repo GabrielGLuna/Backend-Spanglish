@@ -98,6 +98,15 @@ router.post('/confirmar-registro', async (req, res) => {
                 if (err4) console.error('Error deleting code:', err4);
               });
 
+              db.query("INSERT INTO ajustes (usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa) VALUES (?, ?, ?, ?, ?)",
+                [result.insertId, 0, 0, 1, 0], (err5) => {
+                  if (err5) {
+                    console.error('Error creating user settings:', err5);
+                    return res.status(500).json({ error: 'Error al crear ajustes de usuario' });
+                  }
+                }
+              )
+
               res.json({ message: 'Usuario creado exitosamente', id: result.insertId });
             }
           );
@@ -127,7 +136,7 @@ router.post('/login', (req, res) => {
     }
 
     const usuario = results[0];
-    
+
     try {
       const match = await bcrypt.compare(contrasena, usuario.contrasena);
 
@@ -137,7 +146,29 @@ router.post('/login', (req, res) => {
 
       const token = jwt.sign({ id: usuario.id, correo: usuario.correo }, SECRET_KEY, { expiresIn: '2h' });
 
-      res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
+      db.query('SELECT * FROM ajustes WHERE usuario_id = ?', [usuario.id], (err2, ajustesResults) => {
+        if (err2) {
+          console.error('Error querying user settings:', err2);
+          return res.status(500).json({ error: 'Error al consultar ajustes de usuario' });
+        }
+
+        if (ajustesResults.length === 0) {
+          db.query(
+            "INSERT INTO ajustes (usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa) VALUES (?, ?, ?, ?, ?)",
+            [usuario.id, 0, 0, 1, 0],
+            (err3) => {
+              if (err3) {
+                console.error('Error creating user settings:', err3);
+                return res.status(500).json({ error: 'Error al crear ajustes de usuario' });
+              }
+
+              res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
+            }
+          );
+        } else {
+          res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
+        }
+      });
     } catch (compareError) {
       console.error('Error comparing password:', compareError);
       return res.status(500).json({ error: 'Error al verificar contraseña' });
@@ -203,18 +234,21 @@ router.post('/obtenerusuario', (req, res) => {
     const decoded = jwt.verify(token, SECRET_KEY);
     const correo = decoded.correo;
 
-    db.query('SELECT * FROM usuarios WHERE correo = ?', [correo], (err, results) => {
-      if (err) {
-        console.error('Error querying user:', err);
-        return res.status(500).json({ error: 'Error al consultar la base de datos' });
-      }
-      if (results.length === 0) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
+    db.query(
+      'SELECT id, nombre, correo, idioma_preferido, fecha_registro FROM usuarios WHERE correo = ?',
+      [correo],
+      (err, results) => {
+        if (err) {
+          console.error('Error querying user:', err);
+          return res.status(500).json({ error: 'Error al consultar la base de datos' });
+        }
+        if (results.length === 0) {
+          return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
 
-      const { contrasena, ...usuarioSinContrasena } = results[0];
-      res.json({ usuario: usuarioSinContrasena });
-    });
+        res.json({ usuario: results[0] });
+      }
+    );
   } catch (err) {
     console.error('Error verifying token:', err);
     return res.status(401).json({ error: 'Token inválido o expirado' });
@@ -243,9 +277,27 @@ const sendCodeEmail = async (email, code) => {
         ADVERTENCIA: No compartas este código con nadie.
       `,
       html: `
-        <p>Tu código de verificación es:</p>
-        <h1 style="font-size: 30px; text-align:center;"><strong>${code}</strong></h1>
-        <p><em>ADVERTENCIA: No compartas este código con nadie.</em></p>
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border-radius: 12px; background: #f4faff; border: 1px solid #d0e8ff;">
+          <h2 style="color: #0077cc; text-align: center;">Verifica tu correo</h2>
+          
+          <p style="font-size: 16px; color: #333; text-align: center;">
+            Tu código de verificación es:
+          </p>
+
+          <div style="background-color: #e6f0ff; padding: 20px; border-radius: 10px; margin: 20px auto; width: fit-content;">
+            <h1 style="font-size: 36px; color: #004a99; margin: 0; text-align: center;">
+              <strong>${code}</strong>
+            </h1>
+          </div>
+
+          <p style="font-size: 14px; color: #666; text-align: center;">
+            <em>ADVERTENCIA: No compartas este código con nadie.</em>
+          </p>
+
+          <p style="font-size: 12px; color: #aaa; text-align: center; margin-top: 40px;">
+            Spanglish © 2025
+          </p>
+        </div>
       `
     });
 

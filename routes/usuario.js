@@ -47,6 +47,8 @@ router.post('/pre-registro', (req, res) => {
         }
       }
     );
+
+    
   });
 });
 
@@ -108,8 +110,20 @@ router.post('/confirmar-registro', async (req, res) => {
               )
 
               res.json({ message: 'Usuario creado exitosamente', id: result.insertId });
-            }
+              
+            },
           );
+          db.query(
+         `INSERT INTO ajustes(usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa)
+         VALUES (?, ?, ?, ?, ?)`,
+         [result.id, 0,0,1,0],
+         (err, result) => {
+           if (err) return res.status(500).json({ error: err.message });
+           return res.status(201).json({ mensaje: 'Ajustes creados correctamente' });
+         }
+       );
+
+
         } catch (hashError) {
           console.error('Error hashing password:', hashError);
           return res.status(500).json({ error: 'Error al procesar contraseña' });
@@ -399,5 +413,21 @@ router.post('/actualizar', (req, res) => {
     }
   });
 });
+
+router.get('/obtenerajustes/:usuario_id', async (req, res) => {
+  const { usuario_id } = req.params;
+
+  db.query('SELECT * FROM ajustes WHERE usuario_id = ?', [usuario_id], (err, result) => {
+    if (err) {
+      console.error('Error al obtener ajustes:', err);
+      return res.status(500).json({ error: 'Error al obtener ajustes del usuario' });
+    }
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Ajustes no encontrados para este usuario' });
+    }
+    res.json(result[0]);
+  });
+});
+
 
 module.exports = router;

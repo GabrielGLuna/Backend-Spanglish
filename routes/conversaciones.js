@@ -22,7 +22,7 @@ router.post('/gethistorial', (req, res) => {
   if (!id_usuario) {
     return res.status(400).json({ error: 'El id de usuario es requerido' });
   }
-  db.query('SELECT * FROM conversaciones WHERE usuario_id = ?', [id_usuario], (err, results) => {
+  db.query('SELECT * FROM conversaciones WHERE usuario_id = ? order by fecha desc', [id_usuario], (err, results) => {
     if (err) {
       return res.status(500).json({ error: 'Error en la base de datos' });
       print(err);

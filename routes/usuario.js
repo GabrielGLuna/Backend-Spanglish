@@ -60,7 +60,6 @@ router.post('/confirmar-registro', async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos obligatorios' });
   }
 
-  // Verificar código
   db.query(
     "SELECT * FROM codigos_verificacion WHERE correo = ? AND codigo = ? AND creado_en > DATE_SUB(NOW(), INTERVAL 10 MINUTE)",
     [correo, codigo],
@@ -73,7 +72,6 @@ router.post('/confirmar-registro', async (req, res) => {
         return res.status(400).json({ error: 'Código inválido o expirado' });
       }
 
-      // Verificar nuevamente que el email no esté registrado (por si acaso)
       db.query('SELECT id FROM usuarios WHERE correo = ?', [correo], async (err2, userResults) => {
         if (err2) {
           console.error('Error checking user:', err2);
@@ -84,7 +82,6 @@ router.post('/confirmar-registro', async (req, res) => {
         }
 
         try {
-          // Crear usuario
           const pass_hash = await bcrypt.hash(contrasena, 10);
           db.query(
             'INSERT INTO usuarios (nombre, correo, idioma_preferido, contrasena) VALUES (?, ?, ?, ?)',
@@ -95,35 +92,29 @@ router.post('/confirmar-registro', async (req, res) => {
                 return res.status(500).json({ error: 'Error al crear usuario' });
               }
 
-              // Limpiar código usado
+              const userId = result.insertId;
+
+              // Limpiar código
               db.query('DELETE FROM codigos_verificacion WHERE correo = ?', [correo], (err4) => {
                 if (err4) console.error('Error deleting code:', err4);
               });
 
-              db.query("INSERT INTO ajustes (usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa) VALUES (?, ?, ?, ?, ?)",
-                [result.insertId, 0, 0, 1, 0], (err5) => {
+              // Insertar ajustes
+              db.query(
+                "INSERT INTO ajustes (usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa) VALUES (?, ?, ?, ?, ?)",
+                [userId, 0, 0, 1, 0],
+                (err5) => {
                   if (err5) {
                     console.error('Error creating user settings:', err5);
                     return res.status(500).json({ error: 'Error al crear ajustes de usuario' });
                   }
+
+                  // ✅ Solo aquí respondemos al cliente una sola vez
+                  res.json({ message: 'Usuario creado exitosamente', id: userId });
                 }
-              )
-
-              res.json({ message: 'Usuario creado exitosamente', id: result.insertId });
-              
-            },
+              );
+            }
           );
-          db.query(
-         `INSERT INTO ajustes(usuario_id, notificaciones, modo_oscuro, velocidad_voz, voz_activa)
-         VALUES (?, ?, ?, ?, ?)`,
-         [result.id, 0,0,1,0],
-         (err, result) => {
-           if (err) return res.status(500).json({ error: err.message });
-           return res.status(201).json({ mensaje: 'Ajustes creados correctamente' });
-         }
-       );
-
-
         } catch (hashError) {
           console.error('Error hashing password:', hashError);
           return res.status(500).json({ error: 'Error al procesar contraseña' });

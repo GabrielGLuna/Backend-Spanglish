@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = 'tu_clave_secreta_segura'; // guarda en .env idealmente
+const REFRESH_SECRET_KEY = 'SPANGLISHPMP'; // guarda en .env idealmente
 
 // Middleware para proteger rutas
 function verificarToken(req, res, next) {
@@ -14,4 +15,4 @@ function verificarToken(req, res, next) {
   });
 }
 
-module.exports = { verificarToken, SECRET_KEY };
+module.exports = { verificarToken, SECRET_KEY, REFRESH_SECRET_KEY };

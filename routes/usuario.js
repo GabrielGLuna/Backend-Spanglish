@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const jwt = require('jsonwebtoken');
-const { SECRET_KEY } = require('./auth');
+const { SECRET_KEY, REFRESH_SECRET_KEY } = require('./auth');
 
 router.post('/pre-registro', (req, res) => {
   const { nombre, correo, idioma_preferido, contrasena } = req.body;
@@ -150,6 +150,13 @@ router.post('/login', (req, res) => {
       }
 
       const token = jwt.sign({ id: usuario.id, correo: usuario.correo }, SECRET_KEY, { expiresIn: '2h' });
+      const refreshToken = jwt.sign({ id: usuario.id, correo: usuario.correo }, REFRESH_SECRET_KEY, { expiresIn: '30d' });
+
+      db.query('UPDATE usuarios SET refresh_token = ? WHERE id = ?', [refreshToken, usuario.id], (updateErr) => {
+        if (updateErr) {
+          console.error('Error saving refresh token:', updateErr);
+        }
+      });
 
       db.query('SELECT * FROM ajustes WHERE usuario_id = ?', [usuario.id], (err2, ajustesResults) => {
         if (err2) {
@@ -167,11 +174,11 @@ router.post('/login', (req, res) => {
                 return res.status(500).json({ error: 'Error al crear ajustes de usuario' });
               }
 
-              res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
+              res.json({ token, refreshToken, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
             }
           );
         } else {
-          res.json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
+          res.json({ token,refreshToken ,usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo } });
         }
       });
     } catch (compareError) {
@@ -179,6 +186,32 @@ router.post('/login', (req, res) => {
       return res.status(500).json({ error: 'Error al verificar contraseña' });
     }
   });
+});
+
+router.post('/refresh-token', (req, res) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+        return res.status(401).json({ error: 'Refresh token no proporcionado' });
+    }
+
+    db.query('SELECT id, correo FROM usuarios WHERE refresh_token = ?', [refreshToken], (err, results) => {
+        if (err || results.length === 0) {
+            return res.status(403).json({ error: 'Refresh token inválido o revocado' });
+        }
+
+        const usuario = results[0];
+        // Usamos la clave de refresco importada
+        jwt.verify(refreshToken, REFRESH_SECRET_KEY, (jwtErr, decodedUser) => {
+            if (jwtErr || usuario.id !== decodedUser.id) {
+                return res.status(403).json({ error: 'Refresh token inválido' });
+            }
+
+            const userPayload = { id: usuario.id, correo: usuario.correo };
+            // Usamos la clave de acceso importada
+            const newAccessToken = jwt.sign(userPayload, SECRET_KEY, { expiresIn: '2h' });
+            res.json({ accessToken: newAccessToken });
+        });
+    });
 });
 
 // Enviar código (para reenviar) - TAMBIÉN VALIDAR EMAIL AQUÍ
@@ -421,4 +454,4 @@ router.get('/obtenerajustes/:usuario_id', async (req, res) => {
 });
 
 
-module.exports = router;
+module.exports =router;

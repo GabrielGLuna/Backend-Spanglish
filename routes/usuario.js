@@ -189,29 +189,17 @@ router.post('/login', (req, res) => {
 });
 
 router.post('/refresh-token', (req, res) => {
-    const { refreshToken } = req.body;
+    const { refreshToken , usuarioId } = req.body;
     if (!refreshToken) {
         return res.status(401).json({ error: 'Refresh token no proporcionado' });
     }
 
-    db.query('SELECT id, correo FROM usuarios WHERE refresh_token = ?', [refreshToken], (err, results) => {
-        if (err || results.length === 0) {
-            return res.status(403).json({ error: 'Refresh token inválido o revocado' });
+    db.query('UPDATE usuarios SET refresh_token = ? WHERE id = ?', [refreshToken, usuarioId], (updateErr) => {
+        if (!updateErr) {
+          console.log("Refresh token actualizado")
         }
-
-        const usuario = results[0];
-        // Usamos la clave de refresco importada
-        jwt.verify(refreshToken, REFRESH_SECRET_KEY, (jwtErr, decodedUser) => {
-            if (jwtErr || usuario.id !== decodedUser.id) {
-                return res.status(403).json({ error: 'Refresh token inválido' });
-            }
-
-            const userPayload = { id: usuario.id, correo: usuario.correo };
-            // Usamos la clave de acceso importada
-            const newAccessToken = jwt.sign(userPayload, SECRET_KEY, { expiresIn: '2h' });
-            res.json({ accessToken: newAccessToken });
-        });
-    });
+        console.error('Error saving refresh token:', updateErr);
+      });
 });
 
 // Enviar código (para reenviar) - TAMBIÉN VALIDAR EMAIL AQUÍ

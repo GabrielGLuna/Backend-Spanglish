@@ -34,11 +34,10 @@ const pendingSessions = new Map();
 wss.on('connection', (ws) => {
     const sessionId = uuidv4();
     pendingSessions.set(sessionId, { ws, createdAt: Date.now() });
-    console.log(`Nueva sesión QR pendiente: ${sessionId}`);
+    console.log(`Nueva sesión al ws: ${sessionId}`);
     ws.send(JSON.stringify({ type: 'session-id', sessionId }));
 
     ws.on('message', (message) => {
-        let data;
         try {
             data = JSON.parse(message);
         } catch (e) {
@@ -49,7 +48,6 @@ wss.on('connection', (ws) => {
         if (data.type === 'jwt-auth' && data.sessionId && data.refreshToken) {
             const { sessionId: targetSessionId, refreshToken } = data;
             const targetSession = pendingSessions.get(targetSessionId);
-
             if (targetSession) {
                 db.query('SELECT id, correo FROM usuarios WHERE refresh_token = ?', [refreshToken], (err, results) => {
                     if (err) {
@@ -58,12 +56,14 @@ wss.on('connection', (ws) => {
                         return;
                     }
                     if (results.length === 0) {
-                        ws.send(JSON.stringify({ type: 'auth-error', error: 'La sesión de origen es inválida o ha expirado.' }));
+                        console.log('refresh token del data que tenemos:', data.refreshToken)
+                        
+                        ws.send(JSON.stringify({ type: 'auth-error', error: 'La sesión de origen es inválida o ha expiradoxd.' }));
                         return;
                     }
                     const user = results[0];
 
-                    jwt.verify(refreshToken, REFRESH_SECRET_KEY, (jwtErr, decoded) => {
+                    jwt.verify(data.refreshToken, REFRESH_SECRET_KEY, (jwtErr, decoded) => {
                         if (jwtErr || user.id !== decoded.id) {
                             console.error('Error de verificación de JWT o ID de usuario no coincide:', jwtErr);
                             ws.send(JSON.stringify({ type: 'auth-error', error: 'Token de sesión corrupto.' }));
@@ -73,22 +73,25 @@ wss.on('connection', (ws) => {
                         const userPayload = { id: user.id, correo: user.correo };
                         const newAccessToken = jwt.sign(userPayload, SECRET_KEY, { expiresIn: '2h' });
                         const newRefreshToken = jwt.sign(userPayload, REFRESH_SECRET_KEY, { expiresIn: '30d' });
-
+                        
                         db.query('UPDATE usuarios SET refresh_token = ? WHERE id = ?', [newRefreshToken, user.id], (updateErr) => {
+                            console.log("error: " , updateErr)
                             if (updateErr) {
-                                console.error('Error al actualizar refresh_token:', updateErr);
-                                // A pesar del error, intentamos enviar los tokens si la operación anterior fue exitosa
-                            }
-
+                                console.log('Error al actualizar refresh_token:', updateErr);
+                            }else{
+                                console.log("Refresh token actualizado al usuario id: ", user.id)
+                            } 
+                            
                             targetSession.ws.send(JSON.stringify({
-                                type: 'jwt-transfer',
+                                type: 'jwt-transfer',                                
                                 accessToken: newAccessToken,
                                 refreshToken: newRefreshToken
                             }));
+                            console.log("esto: ")
 
                             ws.send(JSON.stringify({
                                 type: 'auth-success',
-                                newRefreshToken: newRefreshToken // Enviamos el nuevo token de refresco al dispositivo que autoriza
+                                newRefreshToken: newRefreshToken 
                             }));
                             pendingSessions.delete(targetSessionId);
                         });
@@ -101,7 +104,7 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        for (const [key, value] of pendingSessions.entries()) {
+        for (const [key, value] of pendingSessions.entries()) {            
             if (value.ws === ws) {
                 pendingSessions.delete(key);
                 console.log(`Sesión QR eliminada: ${key}`);
